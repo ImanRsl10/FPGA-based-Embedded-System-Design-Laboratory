@@ -11,6 +11,7 @@ module async_receiver(
     parameter Oversampling = 4;	// needs to be a power of 2
 
     wire BaudTick, co1, RxD, co;
+    reg cnt_clr;
     reg [3:0] count1;
     reg [1:0] ps, ns;
 	reg [7:0] RxD_data;
@@ -30,7 +31,9 @@ module async_receiver(
 
     always @ (ps) begin
         RxD_data_ready = 1'b0;
+        cnt_clr = 1'b0;
         case(ps)
+            idle: cnt_clr = 1'b1;
             RxD_ready: RxD_data_ready = 1'b1;
         endcase
     end
@@ -43,9 +46,9 @@ module async_receiver(
     end
 
     always @(posedge clk) begin
-        if(rst | co1)
+        if(rst | co1 | cnt_clr)
             count1 <= 4'b0;
-        else if(co)
+        else if(co )
             count1 <= count1 + 1'b1;
     end
 
@@ -56,6 +59,6 @@ module async_receiver(
             RxD_data <= RxD_data;
     end
 
-    assign co1 = (count1 == 4'b1001);
+    assign co1 = (count1 == 4'b1000);
 
 endmodule
