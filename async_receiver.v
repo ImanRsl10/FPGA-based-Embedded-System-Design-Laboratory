@@ -11,7 +11,6 @@ module async_receiver(
     parameter Oversampling = 4;	// needs to be a power of 2
 
     wire BaudTick, co1, RxD, co;
-    reg cnt_clr;
     reg [3:0] count1;
     reg [1:0] ps, ns;
     reg [7:0] RxD_data;
@@ -22,7 +21,7 @@ module async_receiver(
     BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen4(clk, rst, 1'b0, BaudTick);
     overSamplingHandler handler(.clk(clk), .rst(rst), .RxD_raw(RxD_in), .BaudTick(BaudTick), .RxD(RxD), .co(co));
 
-    always @(ps, co1, co, RxD) begin
+    always @(ps, RxD, co, co1) begin
         case(ps)
             idle: ns <= (~RxD & co) ? transmit : idle;
             transmit: ns <= co1 ? RxD_ready : transmit;
@@ -30,7 +29,7 @@ module async_receiver(
         endcase
     end
 
-    always @ (ps) begin
+    always @(ps) begin
 	{RxD_data_ready, sh_en, cnt_en} = 3'b0;
         case(ps)
 	    transmit: {sh_en, cnt_en} = 2'b11;
@@ -53,7 +52,9 @@ module async_receiver(
     end
 
     always @(posedge clk)begin
-	if(co & sh_en)
+	if(rst)
+            RxD_data <= 8'b0;
+	else if(co & sh_en)
             RxD_data <= {RxD, RxD_data[7:1]};
         else
             RxD_data <= RxD_data;
