@@ -6,14 +6,13 @@ module BaudTickGen(
     parameter Baud = 115200;
     parameter Oversampling = 1;
 
-    reg [10:0] count = 11'b0;
-	//assign count = 11'b0;
+    reg [10:0] count;
     
     always @(posedge clk) begin
-        if(tick | rst) count <= 11'b0;
-        else if(enable) count <= count + 1'b1;
+        if(rst | tick) count <= 11'b0;
+        else count <= count + 1'b1;
     end
 
     assign tick = (count == ((ClkFrequency/Baud)/Oversampling)) ? 1'b1 : 1'b0;
-
+//enable | tick
 endmodule
