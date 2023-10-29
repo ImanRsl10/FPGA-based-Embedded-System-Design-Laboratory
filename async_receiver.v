@@ -1,10 +1,9 @@
-module async_receiver(
+module async_receiver(clk, rst, RxD_in, RxD_data_ready, RxD_data);
     input clk,
     input rst,
     input RxD_in,
     output reg RxD_data_ready,
     output reg [7:0] RxD_data  // data received, valid only (for one clock cycle) when RxD_data_ready is asserted
-);
 
     parameter ClkFrequency = 50000000;
     parameter Baud = 115200;
