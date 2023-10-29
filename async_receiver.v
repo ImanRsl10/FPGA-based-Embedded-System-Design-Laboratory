@@ -3,7 +3,7 @@ module async_receiver(
     input rst,
     input RxD_in,
     output reg RxD_data_ready,
-    output [7:0] out  // data received, valid only (for one clock cycle) when RxD_data_ready is asserted
+    output reg [7:0] RxD_data  // data received, valid only (for one clock cycle) when RxD_data_ready is asserted
 );
 
     parameter ClkFrequency = 50000000;
@@ -11,11 +11,10 @@ module async_receiver(
     parameter Oversampling = 4;	// needs to be a power of 2
 
     wire BaudTick, co1, RxD, co;
-    reg [3:0] count1;
-    reg [1:0] ps, ns;
-    reg [7:0] RxD_data;
     reg sh_en, cnt_en;
-    assign out = RxD_data; 
+    reg [3:0] count1;
+	
+    reg [1:0] ps, ns;
     parameter [1:0] idle = 2'b00, transmit = 2'b01, RxD_ready = 2'b10;
 
     BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen4(clk, rst, 1'b0, BaudTick);
@@ -38,7 +37,7 @@ module async_receiver(
     end
 
     always @(posedge clk) begin
-        if (rst)
+        if(rst)
             ps <= idle;
         else
             ps <= ns;
