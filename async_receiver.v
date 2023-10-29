@@ -14,8 +14,9 @@ module async_receiver(
     reg cnt_clr;
     reg [3:0] count1;
     reg [1:0] ps, ns;
-	reg [7:0] RxD_data;
-	assign out = RxD_data;
+    reg [7:0] RxD_data;
+    reg sh_en, cnt_en;
+    assign out = RxD_data; 
     parameter [1:0] idle = 2'b00, transmit = 2'b01, RxD_ready = 2'b10;
 
     BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen4(clk, rst, 1'b0, BaudTick);
@@ -30,10 +31,9 @@ module async_receiver(
     end
 
     always @ (ps) begin
-        RxD_data_ready = 1'b0;
-        cnt_clr = 1'b0;
+	{RxD_data_ready, sh_en, cnt_en} = 3'b0;
         case(ps)
-            idle: cnt_clr = 1'b1;
+	    transmit: {sh_en, cnt_en} = 2'b11;
             RxD_ready: RxD_data_ready = 1'b1;
         endcase
     end
@@ -46,14 +46,14 @@ module async_receiver(
     end
 
     always @(posedge clk) begin
-        if(rst | co1 | cnt_clr)
+        if(rst | co1)
             count1 <= 4'b0;
-        else if(co )
+	else if(co & cnt_en)
             count1 <= count1 + 1'b1;
     end
 
     always @(posedge clk)begin
-        if(co & (ps == transmit))
+	if(co & sh_en)
             RxD_data <= {RxD, RxD_data[7:1]};
         else
             RxD_data <= RxD_data;
