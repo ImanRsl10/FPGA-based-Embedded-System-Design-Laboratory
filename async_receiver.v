@@ -1,9 +1,7 @@
 module async_receiver(clk, rst, RxD_in, RxD_data_ready, RxD_data);
-    input clk,
-    input rst,
-    input RxD_in,
-    output reg RxD_data_ready,
-    output reg [7:0] RxD_data  // data received, valid only (for one clock cycle) when RxD_data_ready is asserted
+    input clk, rst, RxD_in;
+    output reg RxD_data_ready;
+    output reg [7:0] RxD_data;  // data received, valid only (for one clock cycle) when RxD_data_ready is asserted
 
     parameter ClkFrequency = 50000000;
     parameter Baud = 115200;
@@ -28,9 +26,9 @@ module async_receiver(clk, rst, RxD_in, RxD_data_ready, RxD_data);
     end
 
     always @(ps) begin
-	{RxD_data_ready, sh_en, cnt_en} = 3'b0;
+	 {RxD_data_ready, sh_en, cnt_en} = 3'b0;
         case(ps)
-	    transmit: {sh_en, cnt_en} = 2'b11;
+				transmit: {sh_en, cnt_en} = 2'b11;
             RxD_ready: RxD_data_ready = 1'b1;
         endcase
     end
@@ -50,9 +48,9 @@ module async_receiver(clk, rst, RxD_in, RxD_data_ready, RxD_data);
     end
 
     always @(posedge clk)begin
-	if(rst)
+		if(rst)
             RxD_data <= 8'b0;
-	else if(co & sh_en)
+		else if(co & sh_en)
             RxD_data <= {RxD, RxD_data[7:1]};
         else
             RxD_data <= RxD_data;
