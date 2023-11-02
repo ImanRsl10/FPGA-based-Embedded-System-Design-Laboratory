@@ -1,6 +1,8 @@
 module async_transmitter(
     input CLOCK_50,
-    input [9:0] SW,
+    input rst,
+    input TxD_start,
+    input [7:0] SW,
     output UART_TXD,
     output [0:0] LEDG
 );
@@ -11,11 +13,11 @@ parameter ClkFrequency = 50000000;
 parameter Baud = 115200;
 parameter Oversampling = 1;
 
-wire TxD_start;
-assign TxD_start = SW[1];
+//wire TxD_start;
+//assign TxD_start = SW[1];
  
 wire TxDTick;
-	BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen(.clk(CLOCK_50), .rst(rst), .enable(1'b1), .tick(TxDTick));
+BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen(.clk(CLOCK_50), .rst(rst), .enable(1'b1), .tick(TxDTick));
 
 reg [3:0] TxD_state = 0;
 wire TxD_ready = (TxD_state==0);
@@ -25,7 +27,7 @@ reg [7:0] TxD_shift = 0;
 always @(posedge CLOCK_50)
 begin
     if(TxD_ready & TxD_start)
-        TxD_shift <= SW[9:2];
+        TxD_shift <= SW;
     else
     if((TxD_state>4'b0001) & TxDTick)
         TxD_shift <= (TxD_shift >> 1);
@@ -48,4 +50,3 @@ end
 
 assign UART_TXD = (TxD_state == 4'b0000) | ((TxD_state > 4'b0001) & TxD_shift[0]) | (TxD_state == 4'b1010);
 endmodule
-
