@@ -10,7 +10,7 @@ module Shift_Reg16(clk, rst, ld, inp , outp);
 			count = 1'b0; outp <= 8'b0;
 		end
 		else if(ld) begin
-			outp <= inp[count*8+:7]; count <= count + 1'b1;
+			outp = inp[count*8+:7]; count <= count + 1'b1;
 		end
 	end
 
