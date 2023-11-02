@@ -1,11 +1,11 @@
 module TB();
-	reg CLOCK_50 = 1'b1, rst, data_ready = 1'b0;
-	reg [7:0] inp;
-	wire [7:0] outp;
+	reg CLOCK_50 = 1'b1, rst;
+	reg inp;
+	wire outp;
 
 	reg [16 - 1 : 0] Input_mem [1000 - 1 : 0];
 
-	Top tp(CLOCK_50, rst, data_ready, inp, outp);
+	Top tp(CLOCK_50, rst, inp, outp);
 
 	always #5 CLOCK_50 = ~CLOCK_50;
 
@@ -13,15 +13,20 @@ module TB();
 		$readmemb("inputs.txt", Input_mem);
 	end
 
-	integer i;
+	//integer i;
 	initial begin
 		rst = 1'b1; #10
 		rst = 1'b0;
-		for(i = 0; i < 1000 - 1; i = i + 1)begin
-			inp <= Input_mem[i]; data_ready = 1'b1; 
-			#11 data_ready = 1'b0; #5000;
-		end
-		#5000;
+		#10 inp = 1'b0; #29 inp = 1'b1;
+		repeat(4) begin
+            		#4400 inp = 1'b0;
+	    		#4400 inp = 1'b1;
+        	end
+		//for(i = 0; i < 10; i = i + 1)begin
+			//inp <= Input_mem[i]; #35200; data_ready = 1'b1; 
+			//#11 data_ready = 1'b0;
+		//end
+		#35000;
 		$stop;
 	end
 endmodule
