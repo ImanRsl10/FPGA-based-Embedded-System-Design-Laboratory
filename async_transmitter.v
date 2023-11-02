@@ -15,7 +15,7 @@ wire TxD_start;
 assign TxD_start = SW[1];
  
 wire TxDTick;
-BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen(.clk(CLOCK_50), .rst(SW[0]), .enable(1'b1), .tick(TxDTick));
+	BaudTickGen #(ClkFrequency, Baud, Oversampling) tickgen(.clk(CLOCK_50), .rst(rst), .enable(1'b1), .tick(TxDTick));
 
 reg [3:0] TxD_state = 0;
 wire TxD_ready = (TxD_state==0);
