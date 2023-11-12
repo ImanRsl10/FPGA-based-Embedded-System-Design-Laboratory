@@ -9,7 +9,7 @@ extern struct alt_up_dev up_dev;							/* pointer to struct that holds pointers 
 volatile int packet_ready;
 volatile unsigned char mouse_packet[3];
 /* function prototypes */
-void HEX_PS2(unsigned char, unsigned char, unsigned char);
+void HEX_PS2(unsigned char, unsigned char, unsigned char, unsigned char);
 void interval_timer_ISR(void *, unsigned int);
 void pushbutton_ISR(void *, unsigned int);
 void audio_ISR(void *, unsigned int);
@@ -192,6 +192,10 @@ int main(void)
 	alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, blue3_x1 * 4, blue3_y1 * 4, blue3_x2 * 4,
 		blue3_y2 * 4, color, 0);
 
+	//color = 0xFFFF;		// a medium blue color
+	//alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, 0 * 4, 1 * 4, 2 * 4,
+	//2 * 4, color, 0);
+
 	/* output text message in the middle of the VGA monitor */
 	char_buffer_dev = alt_up_char_buffer_open_dev ("/dev/VGA_Char_Buffer");
 	if ( char_buffer_dev == NULL)
@@ -212,52 +216,19 @@ int main(void)
 	/* this loops "bounces" the word ALTERA around on the VGA screen */
 	while (1)
 	{
-
-		while (!timeout)
-			;	// wait to synchronize with timeout, which is set by the interval timer ISR
+	// wait to synchronize with timeout, which is set by the interval timer ISR
 		if(packet_ready)
 		{
-			if(mouse_packet[2] & 1)
-			{
-				alt_up_parallel_port_write_data (up_dev.green_LEDs_dev, 0x1); // set LEDG[0] on
-			}
-			if(mouse_packet[2] & 2) //&and with
-			{
-				alt_up_parallel_port_write_data (up_dev.green_LEDs_dev, 0x2); // set LEDG[1] on
-			}
-			if(mouse_packet[2] & 4)
-			{
-				alt_up_parallel_port_write_data (up_dev.green_LEDs_dev, 0x4); // set LEDG[2] on
-			}
+			HEX_PS2 (mouse_packet[0] & 0x50, mouse_packet[1], mouse_packet[0] & 0xA0, mouse_packet[2]);
+			//alt_up_char_buffer_string (char_buffer_dev," " , mouse_packet[1], mouse_packet[2]);
+			//printf("PACKET READY : %d, mouse packet0: %d, %d, %d,\n", packet_ready, mouse_packet[0], mouse_packet[1], mouse_packet[2]);
+			alt_up_parallel_port_write_data (up_dev.green_LEDs_dev, mouse_packet[0] & 0x7);
 			packet_ready = 0;
 		}
 //
-//		/* move the ALTERA text around on the VGA screen */
-//		alt_up_char_buffer_string (char_buffer_dev, text_erase, ALT_x1, ALT_y); // erase
-//		ALT_x1 += ALT_inc_x;
-//		ALT_x2 += ALT_inc_x;
-//		ALT_y += ALT_inc_y;
-//
-//		if ( (ALT_y == char_buffer_y) || (ALT_y == 0) )
-//			ALT_inc_y = -(ALT_inc_y);
-//		if ( (ALT_x2 == char_buffer_x) || (ALT_x1 == 0) )
-//			ALT_inc_x = -(ALT_inc_x);
-//
-//		if ( (ALT_y >= blue_y1 - 1) && (ALT_y <= blue_y2 + 1) )
-//		{
-//			if ( ((ALT_x1 >= blue_x1 - 1) && (ALT_x1 <= blue_x2 + 1)) ||
-//				((ALT_x2 >= blue_x1 - 1) && (ALT_x2 <= blue_x2 + 1)) )
-//			{
-//				if ( (ALT_y == (blue_y1 - 1)) || (ALT_y == (blue_y2 + 1)) )
-//					ALT_inc_y = -(ALT_inc_y);
-//				else
-//					ALT_inc_x = -(ALT_inc_x);
-//			}
-//		}
-//		alt_up_char_buffer_string (char_buffer_dev, text_ALTERA, ALT_x1, ALT_y);
-//
 //		/* also, display any PS/2 data (from its interrupt service routine) on HEX displays */
-		HEX_PS2 (byte1, byte2, byte3);
+
+
 		timeout = 0;
 	}
 }
@@ -267,7 +238,7 @@ int main(void)
  * Note that we are using pointer accesses for the HEX displays parallel port. We could
  * also use the HAL functions for these ports instead
 ****************************************************************************************/
-void HEX_PS2(unsigned char b1, unsigned char b2, unsigned char b3)
+void HEX_PS2(unsigned char b1x, unsigned char b2, unsigned char b1y, unsigned char b3)
 {
 	volatile int *HEX3_HEX0_ptr = (int *) 0x10000020;
 	volatile int *HEX7_HEX4_ptr = (int *) 0x10000030;
@@ -281,14 +252,16 @@ void HEX_PS2(unsigned char b1, unsigned char b2, unsigned char b3)
 	unsigned char code;
 	int i;
 
-	shift_buffer = (b1 << 16) | (b2 << 8) | b3;
-	for ( i = 0; i < 6; ++i )
-	{
-		nibble = shift_buffer & 0x0000000F;		// character is in rightmost nibble
-		code = seven_seg_decode_table[nibble];
-		hex_segs[i] = code;
-		shift_buffer = shift_buffer >> 4;
-	}
+	shift_buffer = (b1x << 24) | (b2 << 16) | (b1y << 8) | b3;
+	hex_segs[0] = seven_seg_decode_table[b3&0xF];
+	hex_segs[1] = seven_seg_decode_table[(b3 >> 4) &0xF];
+	hex_segs[2] = seven_seg_decode_table[(b1y >> 4)&0x8];
+	hex_segs[3] = seven_seg_decode_table[(b1y>> 5) &0x1];
+	hex_segs[4] = seven_seg_decode_table[b2&0xF];
+	hex_segs[5] = seven_seg_decode_table[(b2>> 4) &0xF];
+	hex_segs[6] = seven_seg_decode_table[b1x >> 4 &0x4];
+	hex_segs[7] = seven_seg_decode_table[(b1x>> 4) &0x1];
+
 	/* drive the hex displays */
 	*(HEX3_HEX0_ptr) = *(int *) (hex_segs);
 	*(HEX7_HEX4_ptr) = *(int *) (hex_segs+4);
