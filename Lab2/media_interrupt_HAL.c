@@ -6,8 +6,29 @@ extern volatile unsigned char byte1, byte2, byte3;	/* modified by PS/2 interrupt
 extern volatile int timeout;								// used to synchronize with the timer
 extern struct alt_up_dev up_dev;							/* pointer to struct that holds pointers to
 																		open devices */
+volatile int buf_index_record;
+volatile int buf_index_play;
 volatile int packet_ready;
+volatile int KEY_value;
+volatile unsigned int l_buf[BUF_SIZE], r_buf[BUF_SIZE], el_buf[BUF_SIZE], er_buf[BUF_SIZE];
 volatile unsigned char mouse_packet[3];
+volatile int mouse_icon[16][8] ={
+		{0,-1,-1,-1,-1,-1,-1,-1},
+		{0,0,-1,-1,-1,-1,-1,-1},
+		{0,1,0,-1,-1,-1,-1,-1},
+		{0,1,1,0,-1,-1,-1,-1},
+		{0,1,1,1,0,-1,-1,-1},
+		{0,1,1,1,1,0,-1,-1},
+		{0,1,1,1,1,1,0,-1},
+		{0,1,1,1,1,0,0,0},
+		{0,1,1,1,0,-1,-1,-1},
+		{0,0,0,1,0,-1,-1,-1},
+		{0,-1,0,1,0,-1,-1,-1},
+		{-1,-1,-1,0,1,0,-1,-1},
+		{-1,-1,-1,0,1,0,-1,-1},
+		{-1,-1,-1,-1,0,1,0,-1},
+		{-1,-1,-1,-1,0,1,0,-1},
+		{-1,-1,-1,-1,-1,0,-1,-1}};;
 /* function prototypes */
 void HEX_PS2(unsigned char, unsigned char, unsigned char, unsigned char);
 void interval_timer_ISR(void *, unsigned int);
@@ -15,6 +36,8 @@ void pushbutton_ISR(void *, unsigned int);
 void audio_ISR(void *, unsigned int);
 void PS2_ISR(void *, unsigned int);
 int Erase_mouse(alt_up_pixel_buffer_dma_dev *, int, int, int , int, int , int , short, short);
+void draw_mouse(alt_up_pixel_buffer_dma_dev *, int, int);
+int erase_mouse_2(alt_up_pixel_buffer_dma_dev *, int, int, int, int, int, int, short, short);
 
 /********************************************************************************
  * This program demonstrates use of the media ports in the DE2 Media Computer
@@ -193,7 +216,9 @@ int main(void)
 	alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, blue3_x1, blue3_y1, blue3_x2, blue3_y2, color, 0);
 
 	mouse_color = 0xFFFF;		// a medium blue color
-	alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x - 5, center_y - 5, center_x + 5, center_y + 5, mouse_color, 0);
+	//alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x - 5, center_y - 5, center_x + 5, center_y + 5, mouse_color, 0);
+	//draw new mouse
+	draw_mouse(pixel_buffer_dev, center_x, center_y);
 
 	/* output text message in the middle of the VGA monitor */
 	char_buffer_dev = alt_up_char_buffer_open_dev ("/dev/VGA_Char_Buffer");
@@ -210,6 +235,7 @@ int main(void)
 	ALT_x1 = 0; ALT_x2 = 5/* ALTERA = 6 chars */; ALT_y = 0; ALT_inc_x = 1; ALT_inc_y = 1;
 	mouse_posx1 = 1; mouse_posx2 = 1;// mouse_posy1 = 0; mouse_posy2 = 1;
 	//alt_up_char_buffer_string (char_buffer_dev, " ", mouse_posx1, mouse_posy1);
+
 	int flag = 0;
 	/* this loops "bounces" the word ALTERA around on the VGA screen */
 	while (1)
@@ -217,9 +243,12 @@ int main(void)
 	// wait to synchronize with timeout, which is set by the interval timer ISR
 		if(packet_ready)
 		{
-			flag = Erase_mouse(pixel_buffer_dev, center_x, center_y, blue1_x1, blue1_y1, blue1_x2, blue1_y2, background_color, color);
-			if (!flag) flag = Erase_mouse(pixel_buffer_dev, center_x, center_y, blue2_x1, blue2_y1, blue2_x2, blue2_y2, background_color, color);
-			if(!flag) flag = Erase_mouse(pixel_buffer_dev, center_x, center_y, blue3_x1, blue3_y1, blue3_x2, blue3_y2, background_color, color);
+			flag = erase_mouse_2(pixel_buffer_dev, center_x, center_y, blue1_x1, blue1_y1, blue1_x2, blue1_y2, background_color, color);
+			if (!flag) flag = erase_mouse_2(pixel_buffer_dev, center_x, center_y, blue2_x1, blue2_y1, blue2_x2, blue2_y2, background_color, color);
+			if(!flag) flag = erase_mouse_2(pixel_buffer_dev, center_x, center_y, blue3_x1, blue3_y1, blue3_x2, blue3_y2, background_color, color);
+			//flag = Erase_mouse(pixel_buffer_dev, center_x, center_y, blue1_x1, blue1_y1, blue1_x2, blue1_y2, background_color, color);
+			//if (!flag) flag = Erase_mouse(pixel_buffer_dev, center_x, center_y, blue2_x1, blue2_y1, blue2_x2, blue2_y2, background_color, color);
+			//if(!flag) flag = Erase_mouse(pixel_buffer_dev, center_x, center_y, blue3_x1, blue3_y1, blue3_x2, blue3_y2, background_color, color);
 			HEX_PS2(mouse_packet[0] & 0x50, mouse_packet[1], mouse_packet[0] & 0xA0, mouse_packet[2]);
 
 			center_x += (mouse_packet[0] & 0x10) ? (-256 + (int)mouse_packet[1]) : (int)mouse_packet[1];
@@ -234,18 +263,65 @@ int main(void)
 			else if (center_y < 5)
 				center_y = 5;
 
-			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x - 5, center_y - 5, center_x + 5, center_y + 5, mouse_color, 0);
+			//alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x - 5, center_y - 5, center_x + 5, center_y + 5, mouse_color, 0);
+			draw_mouse(pixel_buffer_dev, center_x, center_y);
 			alt_up_parallel_port_write_data (up_dev.green_LEDs_dev, mouse_packet[0] & 0x7);
 			packet_ready = 0;
 			flag = 0;
-//			if()
-//			{
-////				buf_index_record = 0;
-//				// clear audio FIFOs
-//				alt_up_audio_reset_audio_core (audio_dev);
-//				// enable audio-in interrupts
-//				alt_up_audio_enable_read_interrupt (audio_dev);
-//			}
+			if((center_x + 5 <= blue1_x2 && center_x - 5 >= blue1_x1) && (center_y + 5 <= blue1_y2 && center_y - 5 >= blue1_y1)
+				&& (mouse_packet[0] & 0x1)){
+				KEY_value = 0x2;
+			}
+			else if((center_x + 5 <= blue2_x2 && center_x - 5 >= blue2_x1) && (center_y + 5 <= blue2_y2 && center_y - 5 >= blue2_y1)
+					&& (mouse_packet[0] & 0x1)){
+				KEY_value = 0x4;
+			}
+			else if((center_x + 5 <= blue3_x2 && center_x - 5 >= blue3_x1) && (center_y + 5 <= blue3_y2 && center_y - 5 >= blue3_y1)
+					&& (mouse_packet[0] & 0x1))
+			{
+				KEY_value = 0x8;
+				*el_buf = *l_buf;
+				*er_buf = *r_buf;
+				int i;
+				for(i = 1000; i < BUF_SIZE; i++)
+				{
+					if(i >= 5000)
+					{
+						el_buf[i] += l_buf[i - 5000];
+						er_buf[i] += r_buf[i - 5000];
+					}
+					el_buf[i] += l_buf[i - 1000];
+					er_buf[i] += r_buf[i - 1000];
+				}
+			}
+
+			if (KEY_value == 0x2)										// check KEY1
+				{
+					// reset the buffer index for recording
+					buf_index_record = 0;
+					// clear audio FIFOs
+					alt_up_audio_reset_audio_core (audio_dev);
+					// enable audio-in interrupts
+					alt_up_audio_enable_read_interrupt (audio_dev);
+				}
+			else if (KEY_value == 0x4)									// check KEY2
+				{
+					// reset counter to start playback
+					buf_index_play = 0;
+					// clear audio FIFOs
+					alt_up_audio_reset_audio_core (audio_dev);
+					// enable audio-out interrupts
+					alt_up_audio_enable_write_interrupt (audio_dev);
+				}
+			else if (KEY_value == 0x8)									// check KEY2
+				{
+					// reset counter to start playback
+					buf_index_play = 0;
+								// clear audio FIFOs
+					alt_up_audio_reset_audio_core (audio_dev);
+								// enable audio-out interrupts
+					alt_up_audio_enable_write_interrupt (audio_dev);
+				}
 		}
 //		/* also, display any PS/2 data (from its interrupt service routine) on HEX displays */
 		timeout = 0;
@@ -334,4 +410,72 @@ int Erase_mouse(alt_up_pixel_buffer_dma_dev *pixel_buffer_dev, int center_x, int
 	else
 		alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x - 5, center_y - 5, center_x + 5, center_y + 5, background_color, 0);
 	return 0;
+}
+
+int erase_mouse_2(alt_up_pixel_buffer_dma_dev *pixel_buffer_dev, int center_x, int center_y, int blue1_x1, int blue1_y1, int blue1_x2, int blue1_y2, short background_color, short color) {
+	if((center_x + 7 >= blue1_x1 && center_x <= blue1_x1) && (center_y + 15 <= blue1_y2 && center_y >= blue1_y1)) {
+		alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, blue1_x1, center_y + 15, background_color, 0);
+	    alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, blue1_x1, center_y, center_x + 7, center_y + 15, color, 0);
+	    return 1;
+	}
+	else if((center_x + 7 >= blue1_x2 && center_x <= blue1_x2) && (center_y + 15 <= blue1_y2 && center_y >= blue1_y1)) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, blue1_x2, center_y, center_x + 7, center_y + 15, background_color, 0);
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, blue1_x2, center_y + 15, color, 0);
+			return 1;
+		}
+		else if((center_x + 7 <= blue1_x2 && center_x >= blue1_x1) && (center_y + 15 >= blue1_y2 && center_y <= blue1_y2)) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, blue1_y2, color, 0);
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, blue1_y2, blue1_x2, center_y + 15, background_color, 0);
+			return 1;
+		}
+		else if((center_x + 7 <= blue1_x2 && center_x >= blue1_x1) && (center_y + 15 >= blue1_y1 && center_y <= blue1_y1)) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y , center_x + 7, blue1_y1, background_color, 0);
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, blue1_y1, blue1_x2, center_y + 15, color, 0);
+			return 1;
+		}
+		else if((center_x + 7 <= blue1_x2 && center_x >= blue1_x1) && (center_y + 15 <= blue1_y2 && center_y >= blue1_y1)){
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, center_y + 15, color, 0);
+			return 1;
+		}
+		else if((center_x + 7 >= blue1_x1 && center_x <= blue1_x1) && (center_y + 15 >= blue1_y1 && center_y <= blue1_y1) ) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, center_y + 15, background_color, 0);
+		    alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, blue1_x1, blue1_y1, center_x + 7, center_y + 15, color, 0);
+		    return 1;
+		}
+		else if((center_x + 7 >= blue1_x2 && center_x <= blue1_x2) && (center_y + 15 >= blue1_y1 && center_y <= blue1_y1) ) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, center_y + 15, background_color, 0);
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y + 15, blue1_x2, blue1_y1, color, 0);
+			return 1;
+		}
+		else if((center_x + 7 >= blue1_x1 && center_x <= blue1_x1) && (center_y + 15 >= blue1_y2 && center_y <= blue1_y2) ) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, center_y + 15, background_color, 0);
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, blue1_x1, blue1_y2, center_x + 15, center_y, color, 0);
+			return 1;
+		}
+		else if((center_x + 7 >= blue1_x2 && center_x <= blue1_x2) && (center_y + 15 >= blue1_y2 && center_y <= blue1_y2) ) {
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, center_y + 15, background_color, 0);
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, blue1_x2, blue1_y2, color, 0);
+			return 1;
+		}
+	else
+		alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x, center_y, center_x + 7, center_y + 15, background_color, 0);
+	return 0;
+}
+void draw_mouse(alt_up_pixel_buffer_dma_dev *pixel_buffer_dev, int center_x, int center_y)
+{
+	short pixel_color;
+	int i, j;
+	for(i = 0; i < 16; i ++)
+	{
+		for(j = 0; j < 8; j++)
+		{
+			if(mouse_icon[i][j] != -1){
+			if(mouse_icon[i][j] == 0)
+				pixel_color = 0x0000;
+			else if(mouse_icon[i][j] == 1)
+				pixel_color = 0xFFFF;
+			alt_up_pixel_buffer_dma_draw_box (pixel_buffer_dev, center_x + j, center_y + i, center_x + j, center_y + i, pixel_color, 0);
+		}
+		}
+	}
 }

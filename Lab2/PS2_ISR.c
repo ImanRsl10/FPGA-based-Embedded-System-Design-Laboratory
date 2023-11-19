@@ -3,6 +3,9 @@
 extern volatile unsigned char byte1, byte2, byte3;
 extern volatile int packet_ready;
 extern volatile unsigned char mouse_packet[3];
+//extern volatile int KEY_value;
+//extern volatile int buf_index_record;
+//extern volatile int buf_index_play;
 
 /***************************************************************************************
  * Pushbutton - Interrupt Service Routine                                
@@ -13,6 +16,8 @@ extern volatile unsigned char mouse_packet[3];
 ****************************************************************************************/
 void PS2_ISR(struct alt_up_dev *up_dev, unsigned int id)
 {
+//	alt_up_audio_dev *audio_dev;
+//		audio_dev = up_dev->audio_dev;
 	unsigned char PS2_data;
 	static int flag = 0;
 	/* check for PS/2 data--display on HEX displays */
@@ -50,6 +55,7 @@ void PS2_ISR(struct alt_up_dev *up_dev, unsigned int id)
 			flag = 1;
 		}
 	}
+
 	return;
 }
 
