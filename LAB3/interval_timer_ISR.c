@@ -21,4 +21,3 @@ void interval_timer_ISR(struct alt_up_dev *up_dev, unsigned int id)
 
 	return;
 }
-
